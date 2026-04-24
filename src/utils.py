@@ -1,9 +1,10 @@
 import torch
 import random
 import numpy as np
-from torch.utils.data import DataLoader, TensorDataset
-from src.model import CustomPnPModule, pnp_loss
+from torch.utils.data import DataLoader
+from src.model import BaseClusteringNet
 from src.metrics import evaluate_clustering
+from src.pnp_module import DeepPlugAndPlayTrainer
 
 def set_seed(seed=42):
     """Cố định seed để đảm bảo tính tái lập (Reproducibility)"""
@@ -32,30 +33,45 @@ def extract_features(dataloader, backbone, device):
             labels.append(lbls)
     return torch.cat(features), torch.cat(labels)
 
-def train_clustering(features, labels, k_max, device, apply_sparsity=True, epochs=50, lr=0.05):
-    """Huấn luyện Module PnP và trả về kết quả"""
-    model = CustomPnPModule(feature_dim=features.shape[1], k_max=k_max).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    loader = DataLoader(TensorDataset(features, labels), batch_size=256, shuffle=True)
-    
-    model.train()
-    for epoch in range(epochs):
-        for batch_z, _ in loader:
-            batch_z = batch_z.to(device)
-            optimizer.zero_grad()
-            p, dist = model(batch_z)
-            loss = pnp_loss(p, dist, apply_sparsity=apply_sparsity)
-            loss.backward()
-            optimizer.step()
-            
-    # Đánh giá sau khi train xong
+def train_clustering(
+    features,
+    labels,
+    k_max,
+    device,
+    apply_sparsity=True,
+    epochs=50,
+    lr=0.05,
+    lambda_param=2.0,
+    enable_split=True,
+    enable_merge=True,
+):
+    """
+    Train Deep Plug-and-Play clustering and return (K*, ACC, NMI, ARI).
+
+    Notes:
+        - `apply_sparsity=False` is mapped to disabling split encouragement (gamma=0),
+          useful for a lightweight ablation with old notebooks.
+    """
+    x = features.to(device)
+    model = BaseClusteringNet(input_dim=x.shape[1], hidden_dim=256, k=k_max).to(device)
+    trainer = DeepPlugAndPlayTrainer(
+        model=model,
+        lambda_param=lambda_param,
+        gamma=0.1 if apply_sparsity else 0.0,
+        lr=lr,
+        batch_size=256,
+        train_epochs_per_cycle=max(5, epochs // 5),
+        max_cycles=5,
+        enable_split=enable_split,
+        enable_merge=enable_merge,
+    )
+    _ = trainer.fit(x)
+
     model.eval()
     with torch.no_grad():
-        p_final, _ = model(features.to(device))
-        predicted_labels = torch.argmax(p_final, dim=1).cpu().numpy()
-        true_labels = labels.numpy()
-        
-        active_k = len(np.unique(predicted_labels)) 
-        acc, nmi, ari = evaluate_clustering(true_labels, predicted_labels)
-        
+        probs, _ = model(x)
+        predicted_labels = torch.argmax(probs, dim=1).cpu().numpy()
+    true_labels = labels.cpu().numpy().reshape(-1)
+    active_k = len(np.unique(predicted_labels))
+    acc, nmi, ari = evaluate_clustering(true_labels, predicted_labels)
     return active_k, acc, nmi, ari

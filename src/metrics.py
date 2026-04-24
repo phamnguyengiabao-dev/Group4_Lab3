@@ -5,8 +5,8 @@ from scipy.optimize import linear_sum_assignment
 
 def cluster_accuracy(y_true, y_pred):
     """Tính ACC sử dụng thuật toán Hungarian Matching"""
-    y_true = np.array(y_true)
-    y_pred = np.array(y_pred)
+    y_true = np.array(y_true).reshape(-1)
+    y_pred = np.array(y_pred).reshape(-1)
     D = max(y_pred.max(), y_true.max()) + 1
     w = np.zeros((D, D), dtype=np.int64)
     for i in range(y_pred.size):

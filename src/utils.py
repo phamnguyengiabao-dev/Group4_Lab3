@@ -1,10 +1,9 @@
 import torch
 import random
 import numpy as np
-from torch.utils.data import DataLoader
 from src.model import BaseClusteringNet
 from src.metrics import evaluate_clustering
-from src.pnp_module import DeepPlugAndPlayTrainer
+from src.pnp_trainer import DeepPlugAndPlayTrainer
 
 def set_seed(seed=42):
     """Cố định seed để đảm bảo tính tái lập (Reproducibility)"""
@@ -20,18 +19,16 @@ def get_device():
     """Kiểm tra và trả về thiết bị khả dụng"""
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def extract_features(dataloader, backbone, device):
-    """Trích xuất vector Z trước để tiết kiệm thời gian train"""
-    backbone.eval()
-    features, labels = [], []
-    with torch.no_grad():
-        for imgs, lbls in dataloader:
-            imgs = imgs.to(device)
-            z = backbone(imgs)
-            z = z.view(z.size(0), -1)
-            features.append(z.cpu())
-            labels.append(lbls)
-    return torch.cat(features), torch.cat(labels)
+def load_feature_file(feature_path, label_path, device=None):
+    """Load pre-extracted features/labels from .npy files."""
+    features = np.load(feature_path)
+    labels = np.load(label_path)
+    features = torch.tensor(features, dtype=torch.float32)
+    labels = torch.tensor(labels, dtype=torch.long).reshape(-1)
+    if device is not None:
+        features = features.to(device)
+        labels = labels.to(device)
+    return features, labels
 
 def train_clustering(
     features,
@@ -42,6 +39,8 @@ def train_clustering(
     epochs=50,
     lr=0.05,
     lambda_param=2.0,
+    gamma=0.1,
+    warmup_epochs=20,
     enable_split=True,
     enable_merge=True,
 ):
@@ -57,11 +56,11 @@ def train_clustering(
     trainer = DeepPlugAndPlayTrainer(
         model=model,
         lambda_param=lambda_param,
-        gamma=0.1 if apply_sparsity else 0.0,
+        gamma=gamma if apply_sparsity else 0.0,
+        warmup_epochs=warmup_epochs,
         lr=lr,
         batch_size=256,
-        train_epochs_per_cycle=max(5, epochs // 5),
-        max_cycles=5,
+        epochs=epochs,
         enable_split=enable_split,
         enable_merge=enable_merge,
     )

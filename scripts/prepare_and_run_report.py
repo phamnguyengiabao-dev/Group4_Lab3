@@ -12,6 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.scan_local import load_or_extract_features
+from scripts.bootstrap_checkpoints import ensure_checkpoints
 from scripts.bootstrap_third_party import ensure_upstream_repo
 
 
@@ -63,6 +64,7 @@ def main() -> None:
     print(f"[env] datasets={args.datasets}")
 
     ensure_upstream_repo()
+    ensure_checkpoints()
     prepare_datasets(
         datasets=args.datasets,
         device=device,

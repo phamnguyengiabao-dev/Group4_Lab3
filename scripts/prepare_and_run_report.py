@@ -12,6 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.scan_local import load_or_extract_features
+from scripts.bootstrap_third_party import ensure_upstream_repo
 
 
 DEFAULT_DATASETS = ["cifar-10", "cifar-20", "stl-10", "imagenet-10", "beans"]
@@ -61,6 +62,7 @@ def main() -> None:
     print(f"[env] device={device}")
     print(f"[env] datasets={args.datasets}")
 
+    ensure_upstream_repo()
     prepare_datasets(
         datasets=args.datasets,
         device=device,

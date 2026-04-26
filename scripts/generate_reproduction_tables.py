@@ -33,6 +33,29 @@ DATASET_CONFIG = {
 }
 
 
+def _scan_run_config(dataset_name: str) -> dict:
+    return {
+        "epochs": 15,
+        "batch_size": 1024 if dataset_name == "imagenet-10" else 2048,
+        "lr": 1e-2,
+        "entropy_weight": 5.0,
+        "warmup_epochs": 0,
+        "init_strategy": "kmeans",
+    }
+
+
+def _pnp_run_config(dataset_name: str, lambda_param: float = 2.0) -> dict:
+    return {
+        "epochs": 80,
+        "batch_size": 1024 if dataset_name == "imagenet-10" else 2048,
+        "lr": 5e-3,
+        "entropy_weight": 5.0,
+        "lambda_param": lambda_param,
+        "warmup_epochs": 30,
+        "init_strategy": "kmeans",
+    }
+
+
 def _paper_table1_rows() -> list[dict]:
     rows = []
     for dataset_name, methods in PAPER_TABLE1.items():
@@ -68,11 +91,7 @@ def run_table1_and_2(device: torch.device):
             enable_pnp=False,
             method_name="SCAN (local)",
             device=device,
-            epochs=5,
-            batch_size=1024 if dataset_name == "imagenet-10" else 2048,
-            lr=1e-2,
-            entropy_weight=5.0,
-            warmup_epochs=0,
+            **_scan_run_config(dataset_name),
         )
         table1_rows.append({"Source": "local", "Method": "SCAN (local)", **scan_result.to_row()})
         comparison_rows.extend(compare_to_paper(dataset_name, scan_result, "SCAN").to_dict("records"))
@@ -84,12 +103,7 @@ def run_table1_and_2(device: torch.device):
                 enable_pnp=True,
                 method_name="ours",
                 device=device,
-                epochs=8,
-                batch_size=1024 if dataset_name == "imagenet-10" else 2048,
-                lr=5e-3,
-                entropy_weight=5.0,
-                lambda_param=2.0,
-                warmup_epochs=2,
+                **_pnp_run_config(dataset_name),
             )
             table1_rows.append({"Source": "local", "Method": "Ours", **local_result.to_row()})
             comparison_rows.extend(compare_to_paper(dataset_name, local_result, "PnP-paper").to_dict("records"))
@@ -124,11 +138,7 @@ def run_table5(device: torch.device):
             enable_pnp=False,
             method_name="SCAN (local)",
             device=device,
-            epochs=4,
-            batch_size=2048,
-            lr=1e-2,
-            entropy_weight=5.0,
-            warmup_epochs=0,
+            **_scan_run_config("cifar-10"),
         )
         ours_result = run_dataset_experiment(
             "cifar-10",
@@ -136,12 +146,7 @@ def run_table5(device: torch.device):
             enable_pnp=True,
             method_name="ours",
             device=device,
-            epochs=6,
-            batch_size=2048,
-            lr=5e-3,
-            entropy_weight=5.0,
-            lambda_param=2.0,
-            warmup_epochs=2,
+            **_pnp_run_config("cifar-10"),
         )
         rows.append(
             {
@@ -167,12 +172,7 @@ def run_table6(device: torch.device):
                 enable_pnp=True,
                 method_name="ours",
                 device=device,
-                epochs=6,
-                batch_size=2048 if dataset_name == "cifar-20" else 1024,
-                lr=5e-3,
-                entropy_weight=5.0,
-                lambda_param=lam,
-                warmup_epochs=2,
+                **_pnp_run_config(dataset_name, lambda_param=lam),
             )
             rows.append(
                 {
@@ -233,15 +233,10 @@ def run_table7(device: torch.device):
                 enable_pnp=name != "No split/merge" or enable_split or enable_merge,
                 method_name="ours",
                 device=device,
-                epochs=6,
-                batch_size=2048,
-                lr=5e-3,
-                entropy_weight=5.0,
-                lambda_param=2.0,
-                warmup_epochs=2,
                 enable_split=enable_split,
                 enable_merge=enable_merge,
                 enable_split_bootstrap=enable_split_bootstrap,
+                **_pnp_run_config("cifar-10"),
             )
             paper_key = "No split loss" if name == "No split loss (proxy)" else name
             paper_ref = PAPER_TABLE7.get(paper_key, {}).get(k0)

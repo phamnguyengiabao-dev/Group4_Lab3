@@ -10,6 +10,30 @@ Reproduction workspace for **Deep Plug-and-Play Cluster** with the following pol
 
 ## Current workflow
 
+### Fresh machine setup
+
+For a new machine where `third_party`, pretrained checkpoints, datasets, or feature caches are still missing, run:
+
+```bash
+python scripts/prepare_and_run_report.py
+```
+
+This script will automatically:
+
+- bootstrap `third_party/Unsupervised-Classification` if it is missing
+- download pretrained checkpoints if they are missing
+- prepare datasets needed by the report flow
+- build or reuse cached features in `data/scan_cache`
+
+After preparation finishes, generate the report tables with:
+
+```bash
+python scripts/generate_reproduction_tables.py --tables table1 table2 table3 table5 table6 table7
+python scripts/generate_extension_tables.py
+```
+
+Detailed setup notes for a fresh machine are also available in [docs/fresh_machine_setup.md](docs/fresh_machine_setup.md).
+
 ### Data processing flow
 
 - `src/scan_datasets.py`: builds the current dataset flow and applies evaluation transforms for `cifar-10`, `cifar-20`, `stl-10`, and `imagenet-10`.

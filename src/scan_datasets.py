@@ -7,7 +7,7 @@ from typing import Callable, Optional, Tuple
 
 import numpy as np
 import torch
-from datasets import load_dataset
+from datasets import concatenate_datasets, load_dataset
 from sklearn.model_selection import StratifiedShuffleSplit
 from torch.utils.data import Dataset
 from torchvision import transforms
@@ -38,10 +38,11 @@ class DatasetBundle:
 class HuggingFaceImageDataset(Dataset):
     """Torch wrapper around a Hugging Face image dataset split."""
 
-    def __init__(self, hf_dataset, transform: Optional[Callable] = None):
+    def __init__(self, hf_dataset, transform: Optional[Callable] = None, label_column: str = "label"):
         self.hf_dataset = hf_dataset
         self.transform = transform
-        raw_labels = list(hf_dataset["label"])
+        self.label_column = label_column
+        raw_labels = list(hf_dataset[label_column])
         unique_labels = sorted(set(raw_labels))
         self.label_to_index = {label: idx for idx, label in enumerate(unique_labels)}
         self.targets = [self.label_to_index[label] for label in raw_labels]
@@ -90,7 +91,7 @@ def get_eval_transform(dataset_name: str):
             ]
         )
 
-    if dataset_name == "imagenet-10":
+    if dataset_name in {"imagenet-10", "beans"}:
         return transforms.Compose(
             [
                 transforms.Resize(256),
@@ -132,5 +133,14 @@ def build_dataset_bundle(name: str, imagenet10_eval_ratio: float = 0.2, seed: in
         train_dataset = HuggingFaceImageDataset(hf_dataset.select(train_idx.tolist()), transform=transform)
         eval_dataset = HuggingFaceImageDataset(hf_dataset.select(eval_idx.tolist()), transform=transform)
         return DatasetBundle(name, train_dataset, eval_dataset, 10, 224, "ImageNet-10")
+
+    if name == "beans":
+        train_split = load_dataset("beans", split="train")
+        val_split = load_dataset("beans", split="validation")
+        test_split = load_dataset("beans", split="test")
+        merged_train = concatenate_datasets([train_split, val_split])
+        train_dataset = HuggingFaceImageDataset(merged_train, transform=transform, label_column="labels")
+        eval_dataset = HuggingFaceImageDataset(test_split, transform=transform, label_column="labels")
+        return DatasetBundle(name, train_dataset, eval_dataset, 3, 224, "Beans")
 
     raise ValueError(f"Unsupported dataset bundle {name}")

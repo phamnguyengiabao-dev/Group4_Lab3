@@ -56,7 +56,7 @@ def build_pretrained_encoder(dataset_name: str, device: torch.device) -> Tuple[n
         backbone.load_state_dict(_strip_prefix_state_dict(state, "backbone."), strict=True)
         return backbone.to(device).eval(), 512
 
-    if dataset_name == "imagenet-10":
+    if dataset_name in {"imagenet-10", "beans"}:
         backbone = resnet50()["backbone"]
         checkpoint = torch.load(MOCO_CKPT, map_location="cpu")
         state_dict = checkpoint["state_dict"] if "state_dict" in checkpoint else checkpoint
